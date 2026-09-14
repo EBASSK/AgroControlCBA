@@ -1,0 +1,19 @@
+[
+  {
+    "id": "V0001",
+    "fecha": "2026-09-14 13:49:15",
+    "items": [
+      {
+        "codigo": "P001",
+        "cantidad": 3.0,
+        "precio_unitario": 3500.0
+      },
+      {
+        "codigo": "P002",
+        "cantidad": 2.0,
+        "precio_unitario": 4000.0
+      }
+    ],
+    "total": 18500.0
+  }
+]

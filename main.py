@@ -1,3 +1,5 @@
+
+
 import json
 import os
 import math
@@ -19,8 +21,36 @@ RUTA_VENTAS = DATA_DIR / "ventas.json"
 SESION = None
 ROL_ADMIN = "INSTRUCTOR/ADMINISTRADOR"
 
+
+def mostrar_tabla(encabezados, filas):
+    if not filas:
+        print("No hay registros para mostrar.")
+        return
+    datos = [[str(valor) for valor in fila] for fila in filas]
+    columnas = []
+    for indice, encabezado in enumerate(encabezados):
+        ancho = len(str(encabezado))
+        for fila in datos:
+            ancho = max(ancho, len(fila[indice]))
+        columnas.append(ancho)
+
+    def formato_celda(valor, ancho, derecha=False):
+        return f"{valor:>{ancho}}" if derecha else f"{valor:<{ancho}}"
+
+    borde_superior = "┌" + "┬".join("─" * (ancho + 2) for ancho in columnas) + "┐"
+    borde_medio = "├" + "┼".join("─" * (ancho + 2) for ancho in columnas) + "┤"
+    borde_inferior = "└" + "┴".join("─" * (ancho + 2) for ancho in columnas) + "┘"
+
+    print()
+    print(borde_superior)
+    print("│ " + " │ ".join(formato_celda(str(encabezado), columnas[i]) for i, encabezado in enumerate(encabezados)) + " │")
+    print(borde_medio)
+    for fila in datos:
+        print("│ " + " │ ".join(formato_celda(fila[i], columnas[i], derecha=(i > 0 and i >= 3)) for i in range(len(encabezados))) + " │")
+    print(borde_inferior)
+
+
 def cargar_json(ruta):
-    """Carga una lista desde un archivo JSON. Si no existe, retorna []."""
     if not ruta.exists():
         return []
     try:
@@ -35,7 +65,6 @@ def cargar_json(ruta):
 
 
 def guardar_json(ruta, datos):
-    """Guarda una lista en un archivo JSON, creando la carpeta si hace falta."""
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_suffix(ruta.suffix + ".tmp")
     contenido = json.dumps(datos, ensure_ascii=False, indent=2, allow_nan=False)
@@ -48,7 +77,6 @@ def guardar_json(ruta, datos):
 
 
 def cargar_datos():
-    """Carga las cuatro colecciones principales desde disco (RF17)."""
     diario = DATA_DIR / "transaccion.json"
     if diario.exists():
         with diario.open(encoding="utf-8") as archivo:
@@ -75,9 +103,6 @@ def crear_respaldo(rutas):
 
 
 def guardar_datos(estado, respaldar=True):
-    """Guarda las cuatro colecciones principales en disco (RF16)."""
-    # Diario durable: si una escritura falla, la siguiente carga completa
-    # la misma operación para no separar una venta de sus movimientos.
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     if respaldar:
         crear_respaldo([RUTA_PRODUCTOS, RUTA_LOTES, RUTA_MOVIMIENTOS, RUTA_VENTAS])
@@ -89,6 +114,8 @@ def guardar_datos(estado, respaldar=True):
     guardar_json(RUTA_VENTAS, estado["ventas"])
     diario.unlink()
 
+
+
 def pedir_texto(mensaje, obligatorio=True):
     while True:
         valor = input(mensaje).strip()
@@ -99,7 +126,6 @@ def pedir_texto(mensaje, obligatorio=True):
 
 
 def pedir_numero(mensaje, tipo=float, minimo=None, permitir_igual=True):
-    """Pide un número validando tipo y un mínimo opcional (RF01, RF02, PF002)."""
     while True:
         entrada = input(mensaje).strip()
         try:
@@ -135,11 +161,12 @@ def pedir_fecha(mensaje):
 
 
 def generar_id_secuencial(coleccion, prefijo, ancho=4):
-    """Genera identificadores tipo M0001, V0001 (regla de negocio 9)."""
     numeros = [int(item["id"][len(prefijo):]) for item in coleccion
                if item["id"].startswith(prefijo) and item["id"][len(prefijo):].isdigit()]
     numero = max(numeros, default=0) + 1
     return f"{prefijo}{numero:0{ancho}d}"
+
+
 
 def buscar_producto(productos, codigo):
     codigo = codigo.strip().upper()
@@ -151,7 +178,6 @@ def buscar_producto(productos, codigo):
 
 
 def registrar_producto(estado):
-    """RF01: valida código único, precio > 0 y stock mínimo >= 0."""
     codigo = pedir_texto("Código del producto: ").upper()
     if buscar_producto(estado["productos"], codigo):
         print(f"Error: ya existe un producto con el código {codigo} (PF001).")
@@ -179,7 +205,6 @@ def registrar_producto(estado):
 
 
 def listar_productos(estado, solo_activos=True):
-    """RF02: lista productos activos y permite búsqueda por código o nombre."""
     termino = pedir_texto(
         "Buscar por código o parte del nombre (Enter para listar todos): ",
         obligatorio=False,
@@ -196,15 +221,18 @@ def listar_productos(estado, solo_activos=True):
         print("No se encontraron productos.")
         return encontrados
 
-    print(f"\n{'Código':<8}{'Nombre':<20}{'Categoría':<15}{'Precio':>10}{'Stock mín.':>12}")
-    for p in encontrados:
-        print(f"{p['codigo']:<8}{p['nombre']:<20}{p['categoria']:<15}{p['precio']:>10}{p['stock_minimo']:>12}")
+    mostrar_tabla(
+        ["Código", "Nombre", "Categoría", "Precio", "Stock mín."],
+        [
+            [p["codigo"], p["nombre"], p["categoria"], p["precio"], p["stock_minimo"]]
+            for p in encontrados
+        ],
+    )
     return encontrados
 
 
 
 def actualizar_producto(estado):
-    """RF03: actualiza datos del producto sin cambiar el código."""
     codigo = pedir_texto("Código del producto a actualizar: ").upper()
     producto = buscar_producto(estado["productos"], codigo)
     if not producto:
@@ -246,7 +274,6 @@ def actualizar_producto(estado):
 
 
 def desactivar_producto(estado):
-    """RF04: desactiva sin eliminar físicamente (regla de negocio 2)."""
     codigo = pedir_texto("Código del producto a desactivar: ").upper()
     producto = buscar_producto(estado["productos"], codigo)
     if not producto:
@@ -259,6 +286,8 @@ def desactivar_producto(estado):
     guardar_datos(estado)
     print(f"Producto {codigo} desactivado. Su historial se conserva.")
 
+
+
 def buscar_lote(lotes, id_lote):
     id_lote = id_lote.strip().upper()
     for lote in lotes:
@@ -269,7 +298,6 @@ def buscar_lote(lotes, id_lote):
 
 
 def registrar_lote(estado):
-    """RF05: registra un lote asociado únicamente a un producto existente y activo."""
     id_lote = pedir_texto("ID del lote: ").upper()
     if buscar_lote(estado["lotes"], id_lote):
         print("Error: ya existe un lote con ese ID.")
@@ -300,7 +328,6 @@ def registrar_lote(estado):
 
 
 def cosechar_lote(estado):
-    """RF06/RF07: cosecha un lote y genera una entrada automática (regla 5, PF003, PF004)."""
     id_lote = pedir_texto("ID del lote a cosechar: ").upper()
     lote = buscar_lote(estado["lotes"], id_lote)
     if not lote:
@@ -325,7 +352,6 @@ def cosechar_lote(estado):
 
 
 def cancelar_lote(estado):
-    """RF06: cambia el estado de un lote a CANCELADO."""
     id_lote = pedir_texto("ID del lote a cancelar: ").upper()
     lote = buscar_lote(estado["lotes"], id_lote)
     if not lote:
@@ -344,15 +370,17 @@ def listar_lotes(estado):
     if not estado["lotes"]:
         print("No hay lotes registrados.")
         return
-    print(f"\n{'ID':<8}{'Producto':<10}{'Siembra':<12}{'Área m²':>10}{'Producido':>12}{'Estado':>16}")
-    for lote in estado["lotes"]:
-        print(
-            f"{lote['id_lote']:<8}{lote['producto_codigo']:<10}{lote['fecha_siembra']:<12}"
-            f"{lote['area_m2']:>10}{lote['cantidad_producida']:>12}{lote['estado']:>16}"
-        )
+    mostrar_tabla(
+        ["ID", "Producto", "Siembra", "Área m²", "Producido", "Estado"],
+        [
+            [lote["id_lote"], lote["producto_codigo"], lote["fecha_siembra"], lote["area_m2"], lote["cantidad_producida"], lote["estado"]]
+            for lote in estado["lotes"]
+        ],
+    )
+
+
 
 def calcular_stock(movimientos, codigo_producto):
-    """Calcula el stock a partir de los movimientos (regla de negocio 3)."""
     stock = 0
     for m in movimientos:
         if m["producto_codigo"] != codigo_producto:
@@ -366,7 +394,6 @@ def calcular_stock(movimientos, codigo_producto):
 
 
 def registrar_movimiento(estado, codigo_producto, tipo, cantidad, motivo):
-    """Crea un movimiento; la operación completa se persiste al confirmar."""
     if not buscar_producto(estado["productos"], codigo_producto):
         raise ValueError("El producto no existe.")
     if tipo not in ("ENTRADA", "SALIDA") or not math.isfinite(cantidad) or cantidad <= 0:
@@ -389,7 +416,6 @@ def registrar_movimiento(estado, codigo_producto, tipo, cantidad, motivo):
 
 
 def entrada_manual(estado):
-    """RF08: entrada manual de inventario con motivo obligatorio."""
     codigo = pedir_texto("Código del producto: ").upper()
     producto = buscar_producto(estado["productos"], codigo)
     if not producto or not producto["activo"]:
@@ -404,7 +430,6 @@ def entrada_manual(estado):
 
 
 def salida_manual(estado):
-    """RF09: salida manual solo si existe stock suficiente (PF005)."""
     codigo = pedir_texto("Código del producto: ").upper()
     producto = buscar_producto(estado["productos"], codigo)
     if not producto or not producto["activo"]:
@@ -426,15 +451,17 @@ def listar_movimientos(estado):
     if not estado["movimientos"]:
         print("No hay movimientos registrados.")
         return
-    print(f"\n{'ID':<8}{'Producto':<10}{'Tipo':<10}{'Cantidad':>10}  {'Motivo':<25}{'Fecha'}")
-    for m in estado["movimientos"]:
-        print(
-            f"{m['id']:<8}{m['producto_codigo']:<10}{m['tipo']:<10}{m['cantidad']:>10}  "
-            f"{m['motivo']:<25}{m['fecha']}"
-        )
+    mostrar_tabla(
+        ["ID", "Producto", "Tipo", "Cantidad", "Motivo", "Fecha"],
+        [
+            [m["id"], m["producto_codigo"], m["tipo"], m["cantidad"], m["motivo"], m["fecha"]]
+            for m in estado["movimientos"]
+        ],
+    )
+
+
 
 def registrar_venta(estado):
-    """RF10/RF11: registra una venta con uno o varios productos (PF006, PF007)."""
     items = []
     print("Agregue los productos de la venta (código vacío para finalizar).")
     while True:
@@ -476,7 +503,6 @@ def registrar_venta(estado):
         "total": total,
     }
 
-
     consolidado = {}
     for item in items:
         consolidado[item["codigo"]] = consolidado.get(item["codigo"], 0) + item["cantidad"]
@@ -507,15 +533,17 @@ def consultar_ventas(estado):
         return
     for v in estado["ventas"]:
         print(f"\nVenta {v['id']} - {v['fecha']} - Total: {v['total']} - {v.get('estado', 'VIGENTE')}")
-        for item in v["items"]:
-            subtotal = item["cantidad"] * item["precio_unitario"]
-            print(
-                f"  {item['codigo']:<8} cant: {item['cantidad']:>6}  "
-                f"precio: {item['precio_unitario']:>10}  subtotal: {subtotal}"
-            )
+        mostrar_tabla(
+            ["Código", "Cantidad", "Precio", "Subtotal"],
+            [
+                [item["codigo"], item["cantidad"], item["precio_unitario"], item["cantidad"] * item["precio_unitario"]]
+                for item in v["items"]
+            ],
+        )
+
+
 
 def alertas_stock(estado):
-    """RF12: productos con stock <= stock mínimo."""
     alertas = []
     for p in estado["productos"]:
         if not p["activo"]:
@@ -528,39 +556,40 @@ def alertas_stock(estado):
         print("No hay alertas de stock en este momento.")
         return
 
-    print(f"\n{'Código':<8}{'Nombre':<20}{'Stock':>10}{'Stock mín.':>12}")
-    for p, stock in alertas:
-        print(f"{p['codigo']:<8}{p['nombre']:<20}{stock:>10}{p['stock_minimo']:>12}")
+    mostrar_tabla(
+        ["Código", "Nombre", "Stock", "Stock mín."],
+        [[p["codigo"], p["nombre"], stock, p["stock_minimo"]] for p, stock in alertas],
+    )
 
 
 
 def reporte_inventario(estado):
-    """RF13: existencias y valor del inventario a precio de venta."""
-    print(f"\n{'Código':<8}{'Nombre':<20}{'Stock':>10}{'Valor total':>15}")
+    filas = []
     valor_total = 0
     for p in estado["productos"]:
         stock = calcular_stock(estado["movimientos"], p["codigo"])
         valor = stock * p["precio"]
         valor_total += valor
-        print(f"{p['codigo']:<8}{p['nombre']:<20}{stock:>10}{valor:>15}")
+        filas.append([p["codigo"], p["nombre"], stock, valor])
+
+    mostrar_tabla(["Código", "Nombre", "Stock", "Valor total"], filas)
     print(f"\nValor total del inventario: {valor_total}")
 
 
 
 def reporte_ventas(estado):
-    """RF14: número de ventas, unidades vendidas e ingresos acumulados."""
     vigentes = [v for v in estado["ventas"] if v.get("estado") != "DEVUELTA"]
     num_ventas = len(vigentes)
     unidades = sum(item["cantidad"] for v in vigentes for item in v["items"])
     ingresos = sum(v["total"] for v in vigentes)
-    print(f"\nNúmero de ventas: {num_ventas}")
-    print(f"Unidades vendidas: {unidades}")
-    print(f"Ingresos acumulados: {ingresos}")
+    mostrar_tabla(
+        ["Indicador", "Valor"],
+        [["Número de ventas", num_ventas], ["Unidades vendidas", unidades], ["Ingresos acumulados", ingresos]],
+    )
 
 
 
 def ranking_productos_vendidos(estado):
-    """RF15: ranking de los 3 productos con mayor cantidad vendida."""
     totales = {}
     for v in estado["ventas"]:
         if v.get("estado") == "DEVUELTA":
@@ -573,23 +602,22 @@ def ranking_productos_vendidos(estado):
         return
 
     ranking = sorted(totales.items(), key=lambda x: x[1], reverse=True)[:3]
-    print("\nRanking de productos más vendidos:")
-    for posicion, (codigo, cantidad) in enumerate(ranking, start=1):
-        producto = buscar_producto(estado["productos"], codigo)
-        nombre = producto["nombre"] if producto else codigo
-        print(f"{posicion}. {codigo} - {nombre}: {cantidad} unidades")
+    mostrar_tabla(
+        ["Posición", "Código", "Nombre", "Unidades"],
+        [
+            [
+                posicion,
+                codigo,
+                buscar_producto(estado["productos"], codigo)["nombre"] if buscar_producto(estado["productos"], codigo) else codigo,
+                cantidad,
+            ]
+            for posicion, (codigo, cantidad) in enumerate(ranking, start=1)
+        ],
+    )
 
 
 
 def reporte_rotacion_productos(estado):
-    """Reto de ampliación: productos con mayor rotación de inventario.
-
-    A diferencia del ranking de más vendidos (RF15, que solo cuenta
-    unidades vendidas), la rotación considera TODAS las salidas de
-    inventario (ventas y salidas manuales) frente al stock actual, lo
-    que ayuda a detectar qué productos se mueven más rápido en
-    proporción a lo que se tiene almacenado.
-    """
     salidas_por_producto = {}
     for m in estado["movimientos"]:
         if m["tipo"] == "SALIDA":
@@ -611,22 +639,25 @@ def reporte_rotacion_productos(estado):
         filas.append((codigo, nombre, total_salidas, stock_actual, rotacion))
 
     filas.sort(key=lambda f: f[4], reverse=True)
-
-    print(f"\n{'Código':<8}{'Nombre':<20}{'Salidas':>10}{'Stock':>10}{'Rotación':>12}")
-    for codigo, nombre, total_salidas, stock_actual, rotacion in filas:
-        print(f"{codigo:<8}{nombre:<20}{total_salidas:>10}{stock_actual:>10}{rotacion:>12.0%}")
+    mostrar_tabla(
+        ["Código", "Nombre", "Salidas", "Stock", "Rotación"],
+        [[codigo, nombre, total_salidas, stock_actual, f"{rotacion:.0%}"] for codigo, nombre, total_salidas, stock_actual, rotacion in filas],
+    )
 
 
 
 def reporte_lotes(estado):
-    """Indicadores de lotes solicitados en el alcance funcional."""
+    filas = []
     for situacion in ("EN_PRODUCCION", "COSECHADO", "CANCELADO"):
         lotes = [l for l in estado["lotes"] if l["estado"] == situacion]
-        print(f"{situacion}: {len(lotes)} lotes; área: {sum(l['area_m2'] for l in lotes):g} m²")
+        filas.append([situacion, len(lotes), f"{sum(l['area_m2'] for l in lotes):g} m²"])
     for producto in estado["productos"]:
         cantidad = sum(l["cantidad_producida"] for l in estado["lotes"]
                        if l["producto_codigo"] == producto["codigo"] and l["estado"] == "COSECHADO")
-        print(f"{producto['codigo']} - {producto['nombre']}: {cantidad:g} {producto['unidad']} cosechadas")
+        filas.append([f"{producto['codigo']} - {producto['nombre']}", f"{cantidad:g} {producto['unidad']}", "Cosechadas"])
+    mostrar_tabla(["Concepto", "Cantidad", "Detalle"], filas)
+
+
 
 def consultar_ventas_por_fecha(estado):
     inicio = pedir_fecha("Fecha inicial (YYYY-MM-DD): ")
@@ -702,12 +733,13 @@ def exportar_inventario_csv(estado):
         escritor.writerow(["codigo", "nombre", "unidad", "activo", "stock", "precio", "valor"])
         for p in estado["productos"]:
             stock = calcular_stock(estado["movimientos"], p["codigo"])
-            # Evitar que un nombre escrito por el usuario se interprete como fórmula.
             textos = [str(p[c]) for c in ("codigo", "nombre", "unidad")]
             textos = ["'" + t if t.lstrip().startswith(("=", "+", "-", "@")) else t for t in textos]
             escritor.writerow(textos + [p["activo"], stock, p["precio"], stock * p["precio"]])
     print(f"Inventario exportado: {ruta}")
     return ruta
+
+
 
 def es_administrador():
     return SESION is not None and SESION["rol"] == ROL_ADMIN
@@ -782,6 +814,8 @@ def crear_usuario(estado):
         return
     guardar_usuario(usuarios, nombre, clave, "OPERADOR" if rol == "1" else ROL_ADMIN)
     print("Usuario creado.")
+
+
 
 def menu_ampliaciones(estado):
     opciones = {"1": consultar_ventas_por_fecha, "2": reporte_utilidad, "3": exportar_inventario_csv}
@@ -907,7 +941,6 @@ def menu_productos(estado):
 
 
 def menu_principal():
-    """Muestra el menú principal y devuelve la opción elegida como texto."""
     print("\n==================== AGROCONTROL CBA ====================")
     print("1. Gestión de productos")
     print("2. Gestión de lotes productivos")
@@ -920,6 +953,8 @@ def menu_principal():
     print("9. Retos de ampliación y usuarios")
     print("0. Salir")
     return input("Seleccione una opción: ").strip()
+
+
 
 OPCIONES_MENU = {
     "1": lambda estado: menu_productos(estado),
@@ -934,7 +969,6 @@ OPCIONES_MENU = {
 
 
 def main():
-    """RF18: maneja entradas inválidas y errores sin cerrar el programa."""
     print("Bienvenido a AgroControl CBA")
     global SESION
     SESION = None
@@ -971,7 +1005,7 @@ def main():
         except OSError as error:
             print(f"No se pudo completar el guardado: {error}. Reinicie para recuperar la operación pendiente.")
             break
-        except Exception as error:  # noqa: BLE001 - blindaje general RF18
+        except Exception as error:
             estado = anterior
             print(f"Ocurrió un error inesperado: {error}. La aplicación continúa.")
 
