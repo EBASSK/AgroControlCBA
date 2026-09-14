@@ -258,3 +258,95 @@ def desactivar_producto(estado):
     producto["activo"] = False
     guardar_datos(estado)
     print(f"Producto {codigo} desactivado. Su historial se conserva.")
+
+def buscar_lote(lotes, id_lote):
+    id_lote = id_lote.strip().upper()
+    for lote in lotes:
+        if lote["id_lote"] == id_lote:
+            return lote
+    return None
+
+
+
+def registrar_lote(estado):
+    """RF05: registra un lote asociado únicamente a un producto existente y activo."""
+    id_lote = pedir_texto("ID del lote: ").upper()
+    if buscar_lote(estado["lotes"], id_lote):
+        print("Error: ya existe un lote con ese ID.")
+        return
+    codigo_producto = pedir_texto("Código del producto asociado: ").upper()
+    producto = buscar_producto(estado["productos"], codigo_producto)
+    if not producto:
+        print("Error: el producto no existe.")
+        return
+    if not producto["activo"]:
+        print("Error: el producto está inactivo, no puede asociarse a un lote nuevo.")
+        return
+    fecha_siembra = pedir_fecha("Fecha de siembra (YYYY-MM-DD): ")
+    area_m2 = pedir_numero("Área en m² (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+
+    lote = {
+        "id_lote": id_lote,
+        "producto_codigo": codigo_producto,
+        "fecha_siembra": fecha_siembra,
+        "area_m2": area_m2,
+        "cantidad_producida": 0,
+        "estado": "EN_PRODUCCION",
+    }
+    estado["lotes"].append(lote)
+    guardar_datos(estado)
+    print(f"Lote {id_lote} registrado en estado EN_PRODUCCION.")
+
+
+
+def cosechar_lote(estado):
+    """RF06/RF07: cosecha un lote y genera una entrada automática (regla 5, PF003, PF004)."""
+    id_lote = pedir_texto("ID del lote a cosechar: ").upper()
+    lote = buscar_lote(estado["lotes"], id_lote)
+    if not lote:
+        print(f"Error: el lote {id_lote} no existe (PF003).")
+        return
+    if lote["estado"] != "EN_PRODUCCION":
+        print(f"Error: el lote {id_lote} ya fue cosechado o está cancelado (PF004).")
+        return
+    cantidad = pedir_numero("Cantidad producida (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+    lote["cantidad_producida"] = cantidad
+    lote["estado"] = "COSECHADO"
+    registrar_movimiento(
+        estado,
+        lote["producto_codigo"],
+        "ENTRADA",
+        cantidad,
+        f"Cosecha lote {id_lote}",
+    )
+    guardar_datos(estado)
+    print(f"Lote {id_lote} cosechado. Se generó una entrada de inventario automática.")
+
+
+
+def cancelar_lote(estado):
+    """RF06: cambia el estado de un lote a CANCELADO."""
+    id_lote = pedir_texto("ID del lote a cancelar: ").upper()
+    lote = buscar_lote(estado["lotes"], id_lote)
+    if not lote:
+        print("El lote no existe.")
+        return
+    if lote["estado"] != "EN_PRODUCCION":
+        print("Solo se pueden cancelar lotes en producción.")
+        return
+    lote["estado"] = "CANCELADO"
+    guardar_datos(estado)
+    print(f"Lote {id_lote} cancelado.")
+
+
+
+def listar_lotes(estado):
+    if not estado["lotes"]:
+        print("No hay lotes registrados.")
+        return
+    print(f"\n{'ID':<8}{'Producto':<10}{'Siembra':<12}{'Área m²':>10}{'Producido':>12}{'Estado':>16}")
+    for lote in estado["lotes"]:
+        print(
+            f"{lote['id_lote']:<8}{lote['producto_codigo']:<10}{lote['fecha_siembra']:<12}"
+            f"{lote['area_m2']:>10}{lote['cantidad_producida']:>12}{lote['estado']:>16}"
+        )
