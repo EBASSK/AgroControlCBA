@@ -350,3 +350,85 @@ def listar_lotes(estado):
             f"{lote['id_lote']:<8}{lote['producto_codigo']:<10}{lote['fecha_siembra']:<12}"
             f"{lote['area_m2']:>10}{lote['cantidad_producida']:>12}{lote['estado']:>16}"
         )
+
+def calcular_stock(movimientos, codigo_producto):
+    """Calcula el stock a partir de los movimientos (regla de negocio 3)."""
+    stock = 0
+    for m in movimientos:
+        if m["producto_codigo"] != codigo_producto:
+            continue
+        if m["tipo"] == "ENTRADA":
+            stock += m["cantidad"]
+        elif m["tipo"] == "SALIDA":
+            stock -= m["cantidad"]
+    return stock
+
+
+
+def registrar_movimiento(estado, codigo_producto, tipo, cantidad, motivo):
+    """Crea un movimiento; la operación completa se persiste al confirmar."""
+    if not buscar_producto(estado["productos"], codigo_producto):
+        raise ValueError("El producto no existe.")
+    if tipo not in ("ENTRADA", "SALIDA") or not math.isfinite(cantidad) or cantidad <= 0:
+        raise ValueError("Tipo o cantidad de movimiento inválidos.")
+    if not motivo.strip():
+        raise ValueError("El motivo es obligatorio.")
+    if tipo == "SALIDA" and cantidad > calcular_stock(estado["movimientos"], codigo_producto):
+        raise ValueError("Stock insuficiente.")
+    movimiento = {
+        "id": generar_id_secuencial(estado["movimientos"], "M"),
+        "producto_codigo": codigo_producto,
+        "tipo": tipo,
+        "cantidad": cantidad,
+        "motivo": motivo,
+        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    estado["movimientos"].append(movimiento)
+    return movimiento
+
+
+
+def entrada_manual(estado):
+    """RF08: entrada manual de inventario con motivo obligatorio."""
+    codigo = pedir_texto("Código del producto: ").upper()
+    producto = buscar_producto(estado["productos"], codigo)
+    if not producto or not producto["activo"]:
+        print("Error: el producto no existe o está inactivo.")
+        return
+    cantidad = pedir_numero("Cantidad de entrada (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+    motivo = pedir_texto("Motivo (obligatorio): ")
+    registrar_movimiento(estado, codigo, "ENTRADA", cantidad, motivo)
+    guardar_datos(estado)
+    print("Entrada registrada correctamente.")
+
+
+
+def salida_manual(estado):
+    """RF09: salida manual solo si existe stock suficiente (PF005)."""
+    codigo = pedir_texto("Código del producto: ").upper()
+    producto = buscar_producto(estado["productos"], codigo)
+    if not producto or not producto["activo"]:
+        print("Error: el producto no existe o está inactivo.")
+        return
+    stock_actual = calcular_stock(estado["movimientos"], codigo)
+    cantidad = pedir_numero("Cantidad de salida (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+    if cantidad > stock_actual:
+        print(f"Error: stock insuficiente (disponible: {stock_actual}) (PF005).")
+        return
+    motivo = pedir_texto("Motivo (obligatorio): ")
+    registrar_movimiento(estado, codigo, "SALIDA", cantidad, motivo)
+    guardar_datos(estado)
+    print("Salida registrada correctamente.")
+
+
+
+def listar_movimientos(estado):
+    if not estado["movimientos"]:
+        print("No hay movimientos registrados.")
+        return
+    print(f"\n{'ID':<8}{'Producto':<10}{'Tipo':<10}{'Cantidad':>10}  {'Motivo':<25}{'Fecha'}")
+    for m in estado["movimientos"]:
+        print(
+            f"{m['id']:<8}{m['producto_codigo']:<10}{m['tipo']:<10}{m['cantidad']:>10}  "
+            f"{m['motivo']:<25}{m['fecha']}"
+        )
