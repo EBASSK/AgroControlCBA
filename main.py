@@ -708,3 +708,78 @@ def exportar_inventario_csv(estado):
             escritor.writerow(textos + [p["activo"], stock, p["precio"], stock * p["precio"]])
     print(f"Inventario exportado: {ruta}")
     return ruta
+
+def es_administrador():
+    return SESION is not None and SESION["rol"] == ROL_ADMIN
+
+
+
+def requiere_admin(funcion, estado):
+    if not es_administrador():
+        print("Acceso denegado. Se requiere el rol INSTRUCTOR/ADMINISTRADOR.")
+        return
+    funcion(estado)
+
+
+
+def guardar_usuario(usuarios, nombre, clave, rol):
+    nombre = nombre.strip().lower()
+    if not nombre or any(u["usuario"] == nombre for u in usuarios):
+        raise ValueError("Usuario vacío o duplicado.")
+    if len(clave) < 8 or rol not in ("OPERADOR", ROL_ADMIN):
+        raise ValueError("La contraseña debe tener al menos 8 caracteres y el rol debe ser válido.")
+    sal = secrets.token_hex(16)
+    derivada = hashlib.pbkdf2_hmac("sha256", clave.encode(), bytes.fromhex(sal), 600000).hex()
+    ruta = DATA_DIR / "usuarios.json"
+    crear_respaldo([ruta])
+    guardar_json(ruta, usuarios + [{"usuario": nombre, "rol": rol, "sal": sal, "hash": derivada}])
+
+
+
+def autenticar(usuarios, nombre, clave):
+    usuario = next((u for u in usuarios if u["usuario"] == nombre.strip().lower()), None)
+    if usuario is None:
+        return None
+    derivada = hashlib.pbkdf2_hmac("sha256", clave.encode(), bytes.fromhex(usuario["sal"]), 600000).hex()
+    if hmac.compare_digest(derivada, usuario["hash"]) and usuario["rol"] in ("OPERADOR", ROL_ADMIN):
+        return {"usuario": usuario["usuario"], "rol": usuario["rol"]}
+    return None
+
+
+
+def iniciar_sesion():
+    usuarios = cargar_json(DATA_DIR / "usuarios.json")
+    if not usuarios:
+        print("Primera ejecución: cree la cuenta INSTRUCTOR/ADMINISTRADOR.")
+        nombre = pedir_texto("Nuevo usuario administrador: ")
+        clave = getpass.getpass("Contraseña (mínimo 8 caracteres): ")
+        if clave != getpass.getpass("Confirme la contraseña: "):
+            print("Las contraseñas no coinciden.")
+            return None
+        guardar_usuario(usuarios, nombre, clave, ROL_ADMIN)
+        usuarios = cargar_json(DATA_DIR / "usuarios.json")
+    for _ in range(3):
+        nombre = pedir_texto("Usuario: ")
+        sesion = autenticar(usuarios, nombre, getpass.getpass("Contraseña: "))
+        if sesion:
+            print(f"Sesión iniciada: {sesion['usuario']} ({sesion['rol']})")
+            return sesion
+        print("Credenciales incorrectas.")
+    return None
+
+
+
+def crear_usuario(estado):
+    usuarios = cargar_json(DATA_DIR / "usuarios.json")
+    nombre = pedir_texto("Nuevo usuario: ")
+    rol = pedir_texto("Rol (1 OPERADOR, 2 INSTRUCTOR/ADMINISTRADOR): ")
+    if rol not in ("1", "2"):
+        print("Rol inválido.")
+        return
+    clave = getpass.getpass("Contraseña (mínimo 8 caracteres): ")
+    if clave != getpass.getpass("Confirme la contraseña: "):
+        print("Las contraseñas no coinciden.")
+        return
+    guardar_usuario(usuarios, nombre, clave, "OPERADOR" if rol == "1" else ROL_ADMIN)
+    print("Usuario creado.")
+
