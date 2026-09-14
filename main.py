@@ -783,3 +783,140 @@ def crear_usuario(estado):
     guardar_usuario(usuarios, nombre, clave, "OPERADOR" if rol == "1" else ROL_ADMIN)
     print("Usuario creado.")
 
+def menu_ampliaciones(estado):
+    opciones = {"1": consultar_ventas_por_fecha, "2": reporte_utilidad, "3": exportar_inventario_csv}
+    administrativas = {"4": configurar_costo, "5": devolver_venta, "6": crear_usuario}
+    while True:
+        print("\n--- Retos de ampliación ---")
+        print("1. Ventas por rango de fechas\n2. Utilidad estimada\n3. Exportar inventario CSV")
+        print("4. Configurar costo unitario (administrador)\n5. Devolver venta (administrador)")
+        print("6. Crear usuario (administrador)\n0. Volver")
+        opcion = input("Seleccione una opción: ").strip()
+        if opcion == "0":
+            return
+        if opcion in opciones:
+            opciones[opcion](estado)
+        elif opcion in administrativas:
+            requiere_admin(administrativas[opcion], estado)
+        else:
+            print("Opción inválida.")
+
+
+
+def menu_reportes(estado):
+    while True:
+        print("\n--- Reportes ---")
+        print("1. Reporte de existencias y valor de inventario")
+        print("2. Reporte de ventas")
+        print("3. Ranking de productos más vendidos")
+        print("4. Productos con mayor rotación")
+        print("5. Indicadores de lotes")
+        print("0. Volver")
+        op = input("Seleccione una opción: ").strip()
+        if op == "1":
+            reporte_inventario(estado)
+        elif op == "2":
+            reporte_ventas(estado)
+        elif op == "3":
+            ranking_productos_vendidos(estado)
+        elif op == "4":
+            reporte_rotacion_productos(estado)
+        elif op == "5":
+            reporte_lotes(estado)
+        elif op == "0":
+            break
+        else:
+            print("Opción inválida.")
+
+
+
+def menu_inventario(estado):
+    while True:
+        print("\n--- Movimientos de inventario ---")
+        print("1. Registrar entrada manual")
+        print("2. Registrar salida manual")
+        print("3. Consultar stock por producto")
+        print("4. Listar movimientos")
+        print("0. Volver")
+        op = input("Seleccione una opción: ").strip()
+        if op == "1":
+            entrada_manual(estado)
+        elif op == "2":
+            salida_manual(estado)
+        elif op == "3":
+            codigo = pedir_texto("Código del producto: ").upper()
+            if buscar_producto(estado["productos"], codigo):
+                print(f"Stock actual: {calcular_stock(estado['movimientos'], codigo)}")
+            else:
+                print("No existe un producto con ese código.")
+        elif op == "4":
+            listar_movimientos(estado)
+        elif op == "0":
+            break
+        else:
+            print("Opción inválida.")
+
+
+
+def menu_lotes(estado):
+    while True:
+        print("\n--- Gestión de lotes productivos ---")
+        print("1. Registrar lote")
+        print("2. Cosechar lote")
+        print("3. Cancelar lote")
+        print("4. Listar lotes")
+        print("0. Volver")
+        op = input("Seleccione una opción: ").strip()
+        if op == "1":
+            registrar_lote(estado)
+        elif op == "2":
+            cosechar_lote(estado)
+        elif op == "3":
+            cancelar_lote(estado)
+        elif op == "4":
+            listar_lotes(estado)
+        elif op == "0":
+            break
+        else:
+            print("Opción inválida.")
+
+
+
+def menu_productos(estado):
+    while True:
+        print("\n--- Gestión de productos ---")
+        print("1. Registrar producto")
+        print("2. Listar / buscar productos")
+        print("3. Actualizar producto")
+        print("4. Desactivar producto")
+        print("0. Volver")
+        op = input("Seleccione una opción: ").strip()
+        if op == "1":
+            requiere_admin(registrar_producto, estado)
+        elif op == "2":
+            listar_productos(estado)
+        elif op == "3":
+            requiere_admin(actualizar_producto, estado)
+        elif op == "4":
+            requiere_admin(desactivar_producto, estado)
+        elif op == "0":
+            break
+        else:
+            print("Opción inválida.")
+
+
+
+def menu_principal():
+    """Muestra el menú principal y devuelve la opción elegida como texto."""
+    print("\n==================== AGROCONTROL CBA ====================")
+    print("1. Gestión de productos")
+    print("2. Gestión de lotes productivos")
+    print("3. Movimientos de inventario")
+    print("4. Registrar venta")
+    print("5. Consultar ventas")
+    print("6. Alertas de stock")
+    print("7. Reportes")
+    print("8. Guardar datos")
+    print("9. Retos de ampliación y usuarios")
+    print("0. Salir")
+    return input("Seleccione una opción: ").strip()
