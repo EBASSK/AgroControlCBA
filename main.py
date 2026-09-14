@@ -920,3 +920,62 @@ def menu_principal():
     print("9. Retos de ampliación y usuarios")
     print("0. Salir")
     return input("Seleccione una opción: ").strip()
+
+OPCIONES_MENU = {
+    "1": lambda estado: menu_productos(estado),
+    "2": lambda estado: menu_lotes(estado),
+    "3": lambda estado: menu_inventario(estado),
+    "4": lambda estado: registrar_venta(estado),
+    "5": lambda estado: consultar_ventas(estado),
+    "6": lambda estado: alertas_stock(estado),
+    "7": lambda estado: menu_reportes(estado),
+    "9": lambda estado: menu_ampliaciones(estado),
+}
+
+
+def main():
+    """RF18: maneja entradas inválidas y errores sin cerrar el programa."""
+    print("Bienvenido a AgroControl CBA")
+    global SESION
+    SESION = None
+    try:
+        SESION = iniciar_sesion()
+        if SESION is None:
+            print("No se inició sesión.")
+            return
+        estado = cargar_datos()
+    except (EOFError, KeyboardInterrupt):
+        print("\nInicio de sesión cancelado.")
+        return
+    except (ValueError, OSError) as error:
+        print(f"No es seguro iniciar: {error}. Revise data/ antes de reintentar.")
+        return
+    while True:
+        anterior = deepcopy(estado)
+        try:
+            opcion = menu_principal()
+            if opcion == "0":
+                guardar_datos(estado)
+                print("Datos guardados. Hasta luego.")
+                break
+            elif opcion == "8":
+                guardar_datos(estado)
+                print("Datos guardados correctamente.")
+            elif opcion in OPCIONES_MENU:
+                OPCIONES_MENU[opcion](estado)
+            else:
+                print("Opción inválida, intente de nuevo.")
+        except (KeyboardInterrupt, EOFError):
+            print("\nOperación interrumpida por el usuario.")
+            break
+        except OSError as error:
+            print(f"No se pudo completar el guardado: {error}. Reinicie para recuperar la operación pendiente.")
+            break
+        except Exception as error:  # noqa: BLE001 - blindaje general RF18
+            estado = anterior
+            print(f"Ocurrió un error inesperado: {error}. La aplicación continúa.")
+
+
+
+if __name__ == "__main__":
+    main()
