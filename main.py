@@ -88,3 +88,55 @@ def guardar_datos(estado, respaldar=True):
     guardar_json(RUTA_MOVIMIENTOS, estado["movimientos"])
     guardar_json(RUTA_VENTAS, estado["ventas"])
     diario.unlink()
+
+def pedir_texto(mensaje, obligatorio=True):
+    while True:
+        valor = input(mensaje).strip()
+        if valor or not obligatorio:
+            return valor
+        print("Este dato es obligatorio, intente de nuevo.")
+
+
+
+def pedir_numero(mensaje, tipo=float, minimo=None, permitir_igual=True):
+    """Pide un número validando tipo y un mínimo opcional (RF01, RF02, PF002)."""
+    while True:
+        entrada = input(mensaje).strip()
+        try:
+            valor = tipo(entrada)
+        except ValueError:
+            print("Debe ingresar un valor numérico válido.")
+            continue
+        if not math.isfinite(valor):
+            print("Debe ingresar un número finito, no NaN ni infinito.")
+            continue
+        if minimo is not None:
+            if permitir_igual and valor < minimo:
+                print(f"El valor debe ser mayor o igual a {minimo}.")
+                continue
+            if not permitir_igual and valor <= minimo:
+                print(f"El valor debe ser mayor a {minimo}.")
+                continue
+        return valor
+
+
+
+def pedir_fecha(mensaje):
+    while True:
+        texto = pedir_texto(mensaje)
+        try:
+            fecha = datetime.strptime(texto, "%Y-%m-%d")
+            if fecha.strftime("%Y-%m-%d") != texto:
+                raise ValueError
+            return texto
+        except ValueError:
+            print("Fecha inválida. Use YYYY-MM-DD y una fecha existente.")
+
+
+
+def generar_id_secuencial(coleccion, prefijo, ancho=4):
+    """Genera identificadores tipo M0001, V0001 (regla de negocio 9)."""
+    numeros = [int(item["id"][len(prefijo):]) for item in coleccion
+               if item["id"].startswith(prefijo) and item["id"][len(prefijo):].isdigit()]
+    numero = max(numeros, default=0) + 1
+    return f"{prefijo}{numero:0{ancho}d}"
