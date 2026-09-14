@@ -140,3 +140,121 @@ def generar_id_secuencial(coleccion, prefijo, ancho=4):
                if item["id"].startswith(prefijo) and item["id"][len(prefijo):].isdigit()]
     numero = max(numeros, default=0) + 1
     return f"{prefijo}{numero:0{ancho}d}"
+
+def buscar_producto(productos, codigo):
+    codigo = codigo.strip().upper()
+    for p in productos:
+        if p["codigo"] == codigo:
+            return p
+    return None
+
+
+
+def registrar_producto(estado):
+    """RF01: valida código único, precio > 0 y stock mínimo >= 0."""
+    codigo = pedir_texto("Código del producto: ").upper()
+    if buscar_producto(estado["productos"], codigo):
+        print(f"Error: ya existe un producto con el código {codigo} (PF001).")
+        return
+    nombre = pedir_texto("Nombre: ")
+    categoria = pedir_texto("Categoría: ")
+    unidad = pedir_texto("Unidad de medida: ")
+    precio = pedir_numero("Precio (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+    stock_minimo = pedir_numero("Stock mínimo (>= 0): ", tipo=int, minimo=0)
+
+    producto = {
+        "codigo": codigo,
+        "nombre": nombre,
+        "categoria": categoria,
+        "unidad": unidad,
+        "precio": precio,
+        "stock_minimo": stock_minimo,
+        "activo": True,
+        "costo_unitario": None,
+    }
+    estado["productos"].append(producto)
+    guardar_datos(estado)
+    print(f"Producto {codigo} registrado correctamente.")
+
+
+
+def listar_productos(estado, solo_activos=True):
+    """RF02: lista productos activos y permite búsqueda por código o nombre."""
+    termino = pedir_texto(
+        "Buscar por código o parte del nombre (Enter para listar todos): ",
+        obligatorio=False,
+    ).upper()
+    encontrados = []
+    for p in estado["productos"]:
+        if solo_activos and not p["activo"]:
+            continue
+        if termino and termino not in p["codigo"] and termino not in p["nombre"].upper():
+            continue
+        encontrados.append(p)
+
+    if not encontrados:
+        print("No se encontraron productos.")
+        return encontrados
+
+    print(f"\n{'Código':<8}{'Nombre':<20}{'Categoría':<15}{'Precio':>10}{'Stock mín.':>12}")
+    for p in encontrados:
+        print(f"{p['codigo']:<8}{p['nombre']:<20}{p['categoria']:<15}{p['precio']:>10}{p['stock_minimo']:>12}")
+    return encontrados
+
+
+
+def actualizar_producto(estado):
+    """RF03: actualiza datos del producto sin cambiar el código."""
+    codigo = pedir_texto("Código del producto a actualizar: ").upper()
+    producto = buscar_producto(estado["productos"], codigo)
+    if not producto:
+        print("No existe un producto con ese código.")
+        return
+    print("Deje en blanco para conservar el valor actual.")
+    nuevo_nombre = pedir_texto(f"Nombre [{producto['nombre']}]: ", obligatorio=False)
+    if nuevo_nombre:
+        producto["nombre"] = nuevo_nombre
+    nueva_categoria = pedir_texto(f"Categoría [{producto['categoria']}]: ", obligatorio=False)
+    if nueva_categoria:
+        producto["categoria"] = nueva_categoria
+    nueva_unidad = pedir_texto(f"Unidad [{producto['unidad']}]: ", obligatorio=False)
+    if nueva_unidad:
+        producto["unidad"] = nueva_unidad
+    resp = pedir_texto(f"Nuevo precio [{producto['precio']}] (Enter para omitir): ", obligatorio=False)
+    if resp:
+        try:
+            nuevo_precio = float(resp)
+            if math.isfinite(nuevo_precio) and nuevo_precio > 0:
+                producto["precio"] = nuevo_precio
+            else:
+                print("Precio inválido, se conserva el anterior (PF002).")
+        except ValueError:
+            print("Precio inválido, se conserva el anterior (PF002).")
+    resp = pedir_texto(f"Nuevo stock mínimo [{producto['stock_minimo']}] (Enter para omitir): ", obligatorio=False)
+    if resp:
+        try:
+            nuevo_min = int(resp)
+            if nuevo_min >= 0:
+                producto["stock_minimo"] = nuevo_min
+            else:
+                print("Stock mínimo inválido, se conserva el anterior.")
+        except ValueError:
+            print("Stock mínimo inválido, se conserva el anterior.")
+    guardar_datos(estado)
+    print("Producto actualizado.")
+
+
+
+def desactivar_producto(estado):
+    """RF04: desactiva sin eliminar físicamente (regla de negocio 2)."""
+    codigo = pedir_texto("Código del producto a desactivar: ").upper()
+    producto = buscar_producto(estado["productos"], codigo)
+    if not producto:
+        print("No existe un producto con ese código.")
+        return
+    if not producto["activo"]:
+        print("El producto ya está inactivo.")
+        return
+    producto["activo"] = False
+    guardar_datos(estado)
+    print(f"Producto {codigo} desactivado. Su historial se conserva.")
