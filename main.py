@@ -432,3 +432,84 @@ def listar_movimientos(estado):
             f"{m['id']:<8}{m['producto_codigo']:<10}{m['tipo']:<10}{m['cantidad']:>10}  "
             f"{m['motivo']:<25}{m['fecha']}"
         )
+
+def registrar_venta(estado):
+    """RF10/RF11: registra una venta con uno o varios productos (PF006, PF007)."""
+    items = []
+    print("Agregue los productos de la venta (código vacío para finalizar).")
+    while True:
+        codigo = pedir_texto("Código del producto (Enter para terminar): ", obligatorio=False).upper()
+        if not codigo:
+            break
+        producto = buscar_producto(estado["productos"], codigo)
+        if not producto or not producto["activo"]:
+            print("Error: el producto no existe o está inactivo.")
+            continue
+        stock_disponible = calcular_stock(estado["movimientos"], codigo)
+        ya_agregado = sum(i["cantidad"] for i in items if i["codigo"] == codigo)
+        cantidad = pedir_numero("Cantidad (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+        if cantidad + ya_agregado > stock_disponible:
+            print(
+                f"Error: no se puede vender más de lo disponible "
+                f"(disponible: {stock_disponible - ya_agregado})."
+            )
+            continue
+        items.append(
+            {
+                "codigo": codigo,
+                "cantidad": cantidad,
+                "precio_unitario": producto["precio"],
+                "costo_unitario": producto.get("costo_unitario"),
+            }
+        )
+        print(f"Producto {codigo} agregado a la venta.")
+
+    if not items:
+        print("Error: una venta debe contener al menos un ítem válido (regla 6).")
+        return
+
+    total = sum(i["cantidad"] * i["precio_unitario"] for i in items)
+    venta = {
+        "id": generar_id_secuencial(estado["ventas"], "V"),
+        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "items": items,
+        "total": total,
+    }
+
+
+    consolidado = {}
+    for item in items:
+        consolidado[item["codigo"]] = consolidado.get(item["codigo"], 0) + item["cantidad"]
+    for codigo, cantidad_total in consolidado.items():
+        disponible = calcular_stock(estado["movimientos"], codigo)
+        if cantidad_total > disponible:
+            print(f"Error: stock insuficiente para {codigo}, venta cancelada.")
+            return
+
+    for item in items:
+        registrar_movimiento(
+            estado,
+            item["codigo"],
+            "SALIDA",
+            item["cantidad"],
+            f"Venta {venta['id']}",
+        )
+
+    estado["ventas"].append(venta)
+    guardar_datos(estado)
+    print(f"Venta {venta['id']} registrada. Total: {total}")
+
+
+
+def consultar_ventas(estado):
+    if not estado["ventas"]:
+        print("No hay ventas registradas.")
+        return
+    for v in estado["ventas"]:
+        print(f"\nVenta {v['id']} - {v['fecha']} - Total: {v['total']} - {v.get('estado', 'VIGENTE')}")
+        for item in v["items"]:
+            subtotal = item["cantidad"] * item["precio_unitario"]
+            print(
+                f"  {item['codigo']:<8} cant: {item['cantidad']:>6}  "
+                f"precio: {item['precio_unitario']:>10}  subtotal: {subtotal}"
+            )
