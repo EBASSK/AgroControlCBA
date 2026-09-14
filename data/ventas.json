@@ -15,5 +15,43 @@
       }
     ],
     "total": 18500.0
+  },
+  {
+    "id": "V0002",
+    "fecha": "2026-09-14 15:36:41",
+    "items": [
+      {
+        "codigo": "P001",
+        "cantidad": 3.0,
+        "precio_unitario": 3500.0,
+        "costo_unitario": null
+      },
+      {
+        "codigo": "P001",
+        "cantidad": 10.0,
+        "precio_unitario": 3500.0,
+        "costo_unitario": null
+      }
+    ],
+    "total": 45500.0
+  },
+  {
+    "id": "V0003",
+    "fecha": "2026-09-14 15:37:59",
+    "items": [
+      {
+        "codigo": "P001",
+        "cantidad": 3.0,
+        "precio_unitario": 3500.0,
+        "costo_unitario": null
+      },
+      {
+        "codigo": "P002",
+        "cantidad": 5.0,
+        "precio_unitario": 4000.0,
+        "costo_unitario": null
+      }
+    ],
+    "total": 30500.0
   }
 ]

@@ -125,9 +125,21 @@ def pedir_texto(mensaje, obligatorio=True):
 
 
 
+def formatear_moneda(valor):
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return "$0.00"
+    return f"${numero:,.2f}"
+
+
+
 def pedir_numero(mensaje, tipo=float, minimo=None, permitir_igual=True):
     while True:
         entrada = input(mensaje).strip()
+        if tipo is float and entrada.startswith("$"):
+            entrada = entrada[1:]
+        entrada = entrada.replace(",", "")
         try:
             valor = tipo(entrada)
         except ValueError:
@@ -185,7 +197,7 @@ def registrar_producto(estado):
     nombre = pedir_texto("Nombre: ")
     categoria = pedir_texto("Categoría: ")
     unidad = pedir_texto("Unidad de medida: ")
-    precio = pedir_numero("Precio (> 0): ", tipo=float, minimo=0, permitir_igual=False)
+    precio = pedir_numero("Precio (> 0) [$]: ", tipo=float, minimo=0, permitir_igual=False)
     stock_minimo = pedir_numero("Stock mínimo (>= 0): ", tipo=int, minimo=0)
 
     producto = {
@@ -224,7 +236,7 @@ def listar_productos(estado, solo_activos=True):
     mostrar_tabla(
         ["Código", "Nombre", "Categoría", "Precio", "Stock mín."],
         [
-            [p["codigo"], p["nombre"], p["categoria"], p["precio"], p["stock_minimo"]]
+            [p["codigo"], p["nombre"], p["categoria"], formatear_moneda(p["precio"]), p["stock_minimo"]]
             for p in encontrados
         ],
     )
@@ -248,10 +260,10 @@ def actualizar_producto(estado):
     nueva_unidad = pedir_texto(f"Unidad [{producto['unidad']}]: ", obligatorio=False)
     if nueva_unidad:
         producto["unidad"] = nueva_unidad
-    resp = pedir_texto(f"Nuevo precio [{producto['precio']}] (Enter para omitir): ", obligatorio=False)
+    resp = pedir_texto(f"Nuevo precio [{formatear_moneda(producto['precio'])}] (Enter para omitir): ", obligatorio=False)
     if resp:
         try:
-            nuevo_precio = float(resp)
+            nuevo_precio = float(resp.replace("$", "").replace(",", ""))
             if math.isfinite(nuevo_precio) and nuevo_precio > 0:
                 producto["precio"] = nuevo_precio
             else:
@@ -523,7 +535,7 @@ def registrar_venta(estado):
 
     estado["ventas"].append(venta)
     guardar_datos(estado)
-    print(f"Venta {venta['id']} registrada. Total: {total}")
+    print(f"Venta {venta['id']} registrada. Total: {formatear_moneda(total)}")
 
 
 
@@ -532,11 +544,11 @@ def consultar_ventas(estado):
         print("No hay ventas registradas.")
         return
     for v in estado["ventas"]:
-        print(f"\nVenta {v['id']} - {v['fecha']} - Total: {v['total']} - {v.get('estado', 'VIGENTE')}")
+        print(f"\nVenta {v['id']} - {v['fecha']} - Total: {formatear_moneda(v['total'])} - {v.get('estado', 'VIGENTE')}")
         mostrar_tabla(
             ["Código", "Cantidad", "Precio", "Subtotal"],
             [
-                [item["codigo"], item["cantidad"], item["precio_unitario"], item["cantidad"] * item["precio_unitario"]]
+                [item["codigo"], item["cantidad"], formatear_moneda(item["precio_unitario"]), formatear_moneda(item["cantidad"] * item["precio_unitario"])]
                 for item in v["items"]
             ],
         )
@@ -572,8 +584,8 @@ def reporte_inventario(estado):
         valor_total += valor
         filas.append([p["codigo"], p["nombre"], stock, valor])
 
-    mostrar_tabla(["Código", "Nombre", "Stock", "Valor total"], filas)
-    print(f"\nValor total del inventario: {valor_total}")
+    mostrar_tabla(["Código", "Nombre", "Stock", "Valor total"], [[codigo, nombre, stock, formatear_moneda(valor)] for codigo, nombre, stock, valor in filas])
+    print(f"\nValor total del inventario: {formatear_moneda(valor_total)}")
 
 
 
@@ -584,7 +596,7 @@ def reporte_ventas(estado):
     ingresos = sum(v["total"] for v in vigentes)
     mostrar_tabla(
         ["Indicador", "Valor"],
-        [["Número de ventas", num_ventas], ["Unidades vendidas", unidades], ["Ingresos acumulados", ingresos]],
+        [["Número de ventas", num_ventas], ["Unidades vendidas", unidades], ["Ingresos acumulados", formatear_moneda(ingresos)]],
     )
 
 
@@ -675,7 +687,7 @@ def configurar_costo(estado):
     if not producto:
         print("No existe el producto.")
         return
-    producto["costo_unitario"] = pedir_numero("Costo unitario (>= 0): ", minimo=0)
+    producto["costo_unitario"] = pedir_numero("Costo unitario (>= 0) [$]: ", minimo=0)
     guardar_datos(estado)
     print("Costo actualizado. Las ventas anteriores conservan su costo histórico.")
 
@@ -694,9 +706,9 @@ def reporte_utilidad(estado):
                 continue
             ingresos += item["cantidad"] * item["precio_unitario"]
             costos += item["cantidad"] * costo
-    print(f"Ingresos con costo conocido: {ingresos:.2f}")
-    print(f"Costo estimado: {costos:.2f}")
-    print(f"Utilidad estimada: {ingresos - costos:.2f}")
+    print(f"Ingresos con costo conocido: {formatear_moneda(ingresos)}")
+    print(f"Costo estimado: {formatear_moneda(costos)}")
+    print(f"Utilidad estimada: {formatear_moneda(ingresos - costos)}")
     print(f"Ítems históricos excluidos por costo desconocido: {sin_costo}")
     print("Estimación de margen bruto; no incluye gastos, impuestos ni otros costos.")
 
@@ -735,7 +747,7 @@ def exportar_inventario_csv(estado):
             stock = calcular_stock(estado["movimientos"], p["codigo"])
             textos = [str(p[c]) for c in ("codigo", "nombre", "unidad")]
             textos = ["'" + t if t.lstrip().startswith(("=", "+", "-", "@")) else t for t in textos]
-            escritor.writerow(textos + [p["activo"], stock, p["precio"], stock * p["precio"]])
+            escritor.writerow(textos + [p["activo"], stock, f"${p['precio']:,.2f}", f"${stock * p['precio']:,.2f}"])
     print(f"Inventario exportado: {ruta}")
     return ruta
 

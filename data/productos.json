@@ -16,5 +16,45 @@
     "precio": 4000.0,
     "stock_minimo": 5,
     "activo": true
+  },
+  {
+    "codigo": "PF001",
+    "nombre": "pollo",
+    "categoria": "1342",
+    "unidad": "ewARFDWE",
+    "precio": 21.0,
+    "stock_minimo": 324,
+    "activo": true,
+    "costo_unitario": null
+  },
+  {
+    "codigo": "L002",
+    "nombre": "PAN",
+    "categoria": "panes",
+    "unidad": "200",
+    "precio": 50000.0,
+    "stock_minimo": 5,
+    "activo": true,
+    "costo_unitario": null
+  },
+  {
+    "codigo": "L003",
+    "nombre": "galleta",
+    "categoria": "galletas",
+    "unidad": "300",
+    "precio": 3500.0,
+    "stock_minimo": 10,
+    "activo": true,
+    "costo_unitario": null
+  },
+  {
+    "codigo": "P004",
+    "nombre": "queso",
+    "categoria": "lacteo",
+    "unidad": "2000",
+    "precio": 3276473.0,
+    "stock_minimo": 0,
+    "activo": true,
+    "costo_unitario": null
   }
 ]
