@@ -628,3 +628,83 @@ def reporte_lotes(estado):
                        if l["producto_codigo"] == producto["codigo"] and l["estado"] == "COSECHADO")
         print(f"{producto['codigo']} - {producto['nombre']}: {cantidad:g} {producto['unidad']} cosechadas")
 
+def consultar_ventas_por_fecha(estado):
+    inicio = pedir_fecha("Fecha inicial (YYYY-MM-DD): ")
+    fin = pedir_fecha("Fecha final (YYYY-MM-DD): ")
+    if fin < inicio:
+        print("La fecha final no puede ser anterior a la inicial.")
+        return
+    filtradas = [v for v in estado["ventas"] if inicio <= v["fecha"][:10] <= fin]
+    consultar_ventas({"ventas": filtradas})
+
+
+
+def configurar_costo(estado):
+    producto = buscar_producto(estado["productos"], pedir_texto("Código del producto: "))
+    if not producto:
+        print("No existe el producto.")
+        return
+    producto["costo_unitario"] = pedir_numero("Costo unitario (>= 0): ", minimo=0)
+    guardar_datos(estado)
+    print("Costo actualizado. Las ventas anteriores conservan su costo histórico.")
+
+
+
+def reporte_utilidad(estado):
+    ingresos = costos = 0
+    sin_costo = 0
+    for venta in estado["ventas"]:
+        if venta.get("estado") == "DEVUELTA":
+            continue
+        for item in venta["items"]:
+            costo = item.get("costo_unitario")
+            if costo is None:
+                sin_costo += 1
+                continue
+            ingresos += item["cantidad"] * item["precio_unitario"]
+            costos += item["cantidad"] * costo
+    print(f"Ingresos con costo conocido: {ingresos:.2f}")
+    print(f"Costo estimado: {costos:.2f}")
+    print(f"Utilidad estimada: {ingresos - costos:.2f}")
+    print(f"Ítems históricos excluidos por costo desconocido: {sin_costo}")
+    print("Estimación de margen bruto; no incluye gastos, impuestos ni otros costos.")
+
+
+
+def devolver_venta(estado):
+    codigo = pedir_texto("ID de la venta a devolver: ").upper()
+    venta = next((v for v in estado["ventas"] if v["id"] == codigo), None)
+    if not venta:
+        print("No existe la venta.")
+        return
+    if venta.get("estado") == "DEVUELTA":
+        print("La venta ya fue devuelta.")
+        return
+    motivo = pedir_texto("Motivo de la devolución total: ")
+    nuevo = deepcopy(estado)
+    for item in venta["items"]:
+        registrar_movimiento(nuevo, item["codigo"], "ENTRADA", item["cantidad"], f"Devolución {codigo}: {motivo}")
+    registro = next(v for v in nuevo["ventas"] if v["id"] == codigo)
+    registro.update(estado="DEVUELTA", motivo_devolucion=motivo,
+                    fecha_devolucion=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    guardar_datos(nuevo)
+    estado.update(nuevo)
+    print(f"Venta {codigo} devuelta. Inventario reintegrado; historial conservado.")
+
+
+
+def exportar_inventario_csv(estado):
+    carpeta = DATA_DIR / "exportaciones"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    ruta = carpeta / ("inventario_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f") + ".csv")
+    with ruta.open("w", encoding="utf-8-sig", newline="") as archivo:
+        escritor = csv.writer(archivo, delimiter=";")
+        escritor.writerow(["codigo", "nombre", "unidad", "activo", "stock", "precio", "valor"])
+        for p in estado["productos"]:
+            stock = calcular_stock(estado["movimientos"], p["codigo"])
+            # Evitar que un nombre escrito por el usuario se interprete como fórmula.
+            textos = [str(p[c]) for c in ("codigo", "nombre", "unidad")]
+            textos = ["'" + t if t.lstrip().startswith(("=", "+", "-", "@")) else t for t in textos]
+            escritor.writerow(textos + [p["activo"], stock, p["precio"], stock * p["precio"]])
+    print(f"Inventario exportado: {ruta}")
+    return ruta
