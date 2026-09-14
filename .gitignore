@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vscode/
+.idea/
+*.log
+data/*.tmp
+data/transaccion.json
+.env
+data/usuarios.json
+data/backups/
+data/exportaciones/
