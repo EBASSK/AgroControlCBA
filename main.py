@@ -513,3 +513,118 @@ def consultar_ventas(estado):
                 f"  {item['codigo']:<8} cant: {item['cantidad']:>6}  "
                 f"precio: {item['precio_unitario']:>10}  subtotal: {subtotal}"
             )
+
+def alertas_stock(estado):
+    """RF12: productos con stock <= stock mínimo."""
+    alertas = []
+    for p in estado["productos"]:
+        if not p["activo"]:
+            continue
+        stock = calcular_stock(estado["movimientos"], p["codigo"])
+        if stock <= p["stock_minimo"]:
+            alertas.append((p, stock))
+
+    if not alertas:
+        print("No hay alertas de stock en este momento.")
+        return
+
+    print(f"\n{'Código':<8}{'Nombre':<20}{'Stock':>10}{'Stock mín.':>12}")
+    for p, stock in alertas:
+        print(f"{p['codigo']:<8}{p['nombre']:<20}{stock:>10}{p['stock_minimo']:>12}")
+
+
+
+def reporte_inventario(estado):
+    """RF13: existencias y valor del inventario a precio de venta."""
+    print(f"\n{'Código':<8}{'Nombre':<20}{'Stock':>10}{'Valor total':>15}")
+    valor_total = 0
+    for p in estado["productos"]:
+        stock = calcular_stock(estado["movimientos"], p["codigo"])
+        valor = stock * p["precio"]
+        valor_total += valor
+        print(f"{p['codigo']:<8}{p['nombre']:<20}{stock:>10}{valor:>15}")
+    print(f"\nValor total del inventario: {valor_total}")
+
+
+
+def reporte_ventas(estado):
+    """RF14: número de ventas, unidades vendidas e ingresos acumulados."""
+    vigentes = [v for v in estado["ventas"] if v.get("estado") != "DEVUELTA"]
+    num_ventas = len(vigentes)
+    unidades = sum(item["cantidad"] for v in vigentes for item in v["items"])
+    ingresos = sum(v["total"] for v in vigentes)
+    print(f"\nNúmero de ventas: {num_ventas}")
+    print(f"Unidades vendidas: {unidades}")
+    print(f"Ingresos acumulados: {ingresos}")
+
+
+
+def ranking_productos_vendidos(estado):
+    """RF15: ranking de los 3 productos con mayor cantidad vendida."""
+    totales = {}
+    for v in estado["ventas"]:
+        if v.get("estado") == "DEVUELTA":
+            continue
+        for item in v["items"]:
+            totales[item["codigo"]] = totales.get(item["codigo"], 0) + item["cantidad"]
+
+    if not totales:
+        print("Aún no hay ventas registradas.")
+        return
+
+    ranking = sorted(totales.items(), key=lambda x: x[1], reverse=True)[:3]
+    print("\nRanking de productos más vendidos:")
+    for posicion, (codigo, cantidad) in enumerate(ranking, start=1):
+        producto = buscar_producto(estado["productos"], codigo)
+        nombre = producto["nombre"] if producto else codigo
+        print(f"{posicion}. {codigo} - {nombre}: {cantidad} unidades")
+
+
+
+def reporte_rotacion_productos(estado):
+    """Reto de ampliación: productos con mayor rotación de inventario.
+
+    A diferencia del ranking de más vendidos (RF15, que solo cuenta
+    unidades vendidas), la rotación considera TODAS las salidas de
+    inventario (ventas y salidas manuales) frente al stock actual, lo
+    que ayuda a detectar qué productos se mueven más rápido en
+    proporción a lo que se tiene almacenado.
+    """
+    salidas_por_producto = {}
+    for m in estado["movimientos"]:
+        if m["tipo"] == "SALIDA":
+            salidas_por_producto[m["producto_codigo"]] = (
+                salidas_por_producto.get(m["producto_codigo"], 0) + m["cantidad"]
+            )
+
+    if not salidas_por_producto:
+        print("Aún no hay salidas de inventario registradas.")
+        return
+
+    filas = []
+    for codigo, total_salidas in salidas_por_producto.items():
+        producto = buscar_producto(estado["productos"], codigo)
+        nombre = producto["nombre"] if producto else codigo
+        stock_actual = calcular_stock(estado["movimientos"], codigo)
+        base = stock_actual + total_salidas
+        rotacion = (total_salidas / base) if base > 0 else 0
+        filas.append((codigo, nombre, total_salidas, stock_actual, rotacion))
+
+    filas.sort(key=lambda f: f[4], reverse=True)
+
+    print(f"\n{'Código':<8}{'Nombre':<20}{'Salidas':>10}{'Stock':>10}{'Rotación':>12}")
+    for codigo, nombre, total_salidas, stock_actual, rotacion in filas:
+        print(f"{codigo:<8}{nombre:<20}{total_salidas:>10}{stock_actual:>10}{rotacion:>12.0%}")
+
+
+
+def reporte_lotes(estado):
+    """Indicadores de lotes solicitados en el alcance funcional."""
+    for situacion in ("EN_PRODUCCION", "COSECHADO", "CANCELADO"):
+        lotes = [l for l in estado["lotes"] if l["estado"] == situacion]
+        print(f"{situacion}: {len(lotes)} lotes; área: {sum(l['area_m2'] for l in lotes):g} m²")
+    for producto in estado["productos"]:
+        cantidad = sum(l["cantidad_producida"] for l in estado["lotes"]
+                       if l["producto_codigo"] == producto["codigo"] and l["estado"] == "COSECHADO")
+        print(f"{producto['codigo']} - {producto['nombre']}: {cantidad:g} {producto['unidad']} cosechadas")
+
